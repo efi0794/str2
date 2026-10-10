@@ -13,14 +13,14 @@
 - **5つの実表、6つの Oracle VIEW** を使用
 - A5:SQL Mk-2 / SQL Developer 等で確認できる設計資料とSQL
 
-**重要：** HoYoLABの自動取得とDiscord通知はこの課題版には含みません。日課は手動記録です。以前のstrのログイン機能も移植していません。学校PCのlocalhost上で、発表用ユーザーID=1を使います。インターネット公開しないでください。
+**重要：** HoYoLABの自動取得を追加しました。画面から最新のゲーム状況を確認できます。Oracle側の手動CRUDも引き続き使用できます。Discord通知とログイン画面はありません。学校PCのlocalhost専用です。
 
 ## 必要な環境
 
 - Windowsの学校PC、Node.js 20以降、npm
 - Oracle Database 12c以降 (例: Oracle XE 21c)、動作中のDBと接続できるユーザー
 - SQL Developer などのOracle用SQL実行ソフト
-- インストールするnpmパッケージ: express / oracledb / dotenv
+- インストールするnpmパッケージ: express / oracledb / dotenv / node-hoyolab
 
 ローカルDBの例は XEPDB1 ですが、学校のサービス名が違う場合は読み替えてください。Oracle Thin modeを使用するため、通常はOracle Clientの別途インストールは不要です。
 
