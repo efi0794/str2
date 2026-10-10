@@ -56,13 +56,14 @@ export async function saveResourceObservations(db, observations, userId = 1) {
       continue; // 同じ時刻の再取得・古いキャッシュ・逆順の取得は保存しない
     }
     const observedAt = isoToOracle(item.fetchedAt);
+    const observedAtKey = new Date(fetchedMs).toISOString(); // UTCキー: TIMESTAMP WITH TIME ZONE はUNIQUE不可
     try {
       await db.execute(
         "INSERT INTO hoyo_resource_snapshots " +
-        "(user_id, game_id, current_amount, max_amount, observed_at) " +
+        "(user_id, game_id, current_amount, max_amount, observed_at, observed_at_key) " +
         "VALUES (:userId, :gameId, :currentAmount, :maxAmount, " +
-        "TO_TIMESTAMP_TZ(:observedAt, '" + ORACLE_TZ_FORMAT + "'))",
-        { userId, gameId, currentAmount: item.currentAmount, maxAmount: item.maxAmount, observedAt }
+        "TO_TIMESTAMP_TZ(:observedAt, '" + ORACLE_TZ_FORMAT + "'), :observedAtKey)",
+        { userId, gameId, currentAmount: item.currentAmount, maxAmount: item.maxAmount, observedAt, observedAtKey }
       );
     } catch (err) {
       if (err?.errorNum === 1) { skipped++; continue; } // 並列要求時の重複だけ無視
@@ -79,9 +80,9 @@ export async function saveResourceObservations(db, observations, userId = 1) {
         "(user_id, game_id, amount, used_at, source, note, snapshot_id) " +
         "SELECT :userId, :gameId, :amount, observed_at, 'ESTIMATED', :note, snapshot_id " +
         "FROM hoyo_resource_snapshots WHERE user_id = :userId AND game_id = :gameId " +
-        "AND observed_at = TO_TIMESTAMP_TZ(:observedAt, '" + ORACLE_TZ_FORMAT + "')",
+        "AND observed_at_key = :observedAtKey",
         {
-          userId, gameId, amount: drop, observedAt,
+          userId, gameId, amount: drop, observedAtKey,
           note: "観測時の減少差分（使用時刻ではありません）"
         }
       );
