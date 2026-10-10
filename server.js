@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createHoYoBridge, collectImportCandidates, importCandidatesIntoOracle } from "./hoyo-bridge.js";
 import express from "express";
 import oracledb from "oracledb";
 import { fileURLToPath } from "node:url";
@@ -6,7 +7,8 @@ import { fileURLToPath } from "node:url";
 const { ORACLE_USER, ORACLE_PASSWORD, ORACLE_CONNECT_STRING } = process.env;
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "127.0.0.1";
-const USER_ID = 1; // 学校での発表用・ローカル単一ユーザー
+const USER_ID = 1;
+const hoyoBridge = createHoYoBridge(); // 学校での発表用・ローカル単一ユーザー
 if (!ORACLE_USER || !ORACLE_PASSWORD || !ORACLE_CONNECT_STRING) {
   console.error("Oracle接続情報が不足しています。.env.exampleを参考に.envを用意してください。");
   process.exit(1);
@@ -87,6 +89,36 @@ function dbRoute(handler) {
     }
   };
 }
+
+// HoYoLAB API requests are intentionally outside the Oracle connection pool.
+app.get("/api/hoyo/status", async (req, res) => {
+  try {
+    const data = await hoyoBridge.getStatus({ force: req.query.refresh === "1" });
+    res.set("Cache-Control", "no-store").json(data);
+  } catch (error) {
+    console.error("[HOYO]", error?.name || "HoYoLAB取得エラー");
+    res.status(502).json({ ok: false, error: "HoYoLABの取得処理に失敗しました。" });
+  }
+});
+
+// Live HoYoLAB values are imported only after the user explicitly presses a button.
+app.post("/api/hoyo/sync", dbRoute(async (_req, res, db) => {
+  const status = await hoyoBridge.getStatus();
+  if (!status.enabled) {
+    throw new InputError("HoYoLABの認証とUIDが未設定です。.envを確認してください。", 400);
+  }
+  const candidates = collectImportCandidates(status.games);
+  if (!candidates.length) {
+    throw new InputError("現在、Oracleへ取り込める確定値がありません。HoYoLABの取得状況を確認してください。", 422);
+  }
+  const result = await importCandidatesIntoOracle(db, candidates, USER_ID);
+  res.json({
+    ok: true,
+    ...result,
+    message: "HoYoLABからOracleへ取り込み: 実績" + result.taskRecords +
+      "件 / リソース" + result.resources + "件（スキップ" + result.skipped + "件）"
+  });
+}));
 
 app.get("/api/health", dbRoute(async (_req, res, db) => {
   const result = await db.execute("SELECT TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS') AS DB_TIME FROM dual");
