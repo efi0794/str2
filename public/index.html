@@ -14,7 +14,7 @@
       <div>
         <div class="eyebrow">STR2 / ORACLE DATABASE EDITION</div>
         <h1>今日、全部やった？</h1>
-        <p class="lead">3ゲームのデイリーをOracle Databaseで管理。今日の記録を登録・編集・削除できます。</p>
+        <p class="lead">3ゲームのデイリーをHoYoLABから自動確認。Oracle Databaseへの保存とCRUDもできます。</p>
       </div>
       <button id="reloadButton" class="refresh" type="button">↻ 最新状態に更新</button>
     </header>
@@ -25,6 +25,22 @@
       <span class="pill">完了 <b id="done">--</b></span>
       <span class="pill">未完了 <b id="left">--</b></span>
       <span class="pill oracle-pill">● ORACLE LOCAL</span>
+    </section>
+    <section class="hoyo-panel panel" aria-labelledby="hoyoHeading">
+      <div class="hoyo-heading">
+        <div>
+          <span class="section-label">HOYOLAB / LIVE DATA</span>
+          <h2 id="hoyoHeading">HoYoLAB 自動取得</h2>
+          <p class="muted">ページ起動時と約10分ごとに取得します。Oracleへの保存は、確認後にボタンを押したときだけ実行します。</p>
+        </div>
+        <div class="hoyo-controls">
+          <button type="button" id="hoyoRefresh">↻ HoYoLAB再取得</button>
+          <button type="button" id="hoyoImport" class="primary" disabled>取得結果をOracleに取り込む</button>
+        </div>
+      </div>
+      <p class="hoyo-status" id="hoyoStatus" role="status" aria-live="polite">HoYoLABの接続設定を確認しています…</p>
+      <div class="hoyo-grid" id="hoyoGames"></div>
+      <p class="hoyo-help">未設定の場合は <code>.env</code> にCookie情報とUIDを記入してサーバーを再起動してください。未取得・判定不能の項目はOracleに保存しません。</p>
     </section>
     <section aria-label="ゲーム別の状況">
       <div id="board" class="games"></div>
@@ -44,7 +60,7 @@
     </section>
     <footer>
       <span>STR2 — strを基にした、Oracle学習用の独立Webアプリ</span>
-      <span>※ 日課・リソースは手動記録。HoYoLABから自動取得する版ではありません。</span>
+      <span>※ HoYoLABの情報は自動表示。手動のOracle記録は保存操作をするまで変わりません。</span>
     </footer>
   </main>
   <dialog id="editDialog" aria-labelledby="editHeading">
