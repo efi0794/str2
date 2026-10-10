@@ -137,7 +137,9 @@ export async function getGenshinStatus(credentials) {
         : tasksDone
         ? rewardReceived === true
           ? "依頼完了・追加報酬受取済み"
-          : "依頼は完了、冒険者協会の追加報酬が未受取"
+          : rewardReceived === false
+            ? "依頼は完了、冒険者協会の追加報酬が未受取"
+            : "依頼は完了、追加報酬の取得状況は判定不能"
         : `${current} / ${max} 件完了`
     };
     out.resource = {
