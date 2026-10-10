@@ -11,8 +11,10 @@ CREATE TABLE hoyo_resource_snapshots (
   current_amount NUMBER(8) NOT NULL CHECK (current_amount >= 0),
   max_amount NUMBER(8) NOT NULL CHECK (max_amount > 0),
   observed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  -- OracleはTIMESTAMP WITH TIME ZONEをUNIQUEに使えないため、正規化したUTC文字列で重複を防止
+  observed_at_key VARCHAR2(24 CHAR) NOT NULL,
   CONSTRAINT ck_snapshot_range CHECK (current_amount <= max_amount),
-  CONSTRAINT uq_snapshot_observed UNIQUE (user_id, game_id, observed_at)
+  CONSTRAINT uq_snapshot_observed UNIQUE (user_id, game_id, observed_at_key)
 );
 
 -- MANUAL=実際に使用した時刻と量を手入力
