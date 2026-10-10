@@ -60,4 +60,4 @@ FROM v_stamina_use_history
 GROUP BY user_id, game_id, source,
          TRUNC(CAST(used_at AT TIME ZONE '+09:00' AS DATE));
 
-PROMPT STR2 history migration complete (7 tables, 9 views in total)
+PROMPT 06_stamina_history.sql reached end. Check errors and verify 7 tables / 9 views.
