@@ -6,7 +6,9 @@
   <meta name="color-scheme" content="dark">
   <title>STR2 | Oracle Daily Command Center</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/stamina.css">
   <script src="/app.js" defer></script>
+  <script src="/stamina.js" defer></script>
 </head>
 <body>
   <main class="shell">
@@ -44,6 +46,94 @@
     </section>
     <section aria-label="ゲーム別の状況">
       <div id="board" class="games"></div>
+    </section>
+    <section id="staminaPanel" class="stamina-panel panel" aria-labelledby="staminaHeading">
+      <div class="stamina-head">
+        <div>
+          <span class="section-label">ORACLE / STAMINA HISTORY &amp; ANALYTICS</span>
+          <h2 id="staminaHeading">スタミナ使用時間の統計・履歴</h2>
+          <p class="muted">いつ使うことが多いかを日本時間で集計。手動記録とHoYoLABからの推定記録を分けて表示します。</p>
+        </div>
+        <div class="stamina-filters">
+          <label>ゲーム
+            <select id="staminaGameFilter" aria-label="統計対象のゲーム">
+              <option value="0">すべてのゲーム</option>
+              <option value="1">スターレイル</option>
+              <option value="2">原神</option>
+              <option value="3">ゼンゼロ</option>
+            </select>
+          </label>
+          <label>期間
+            <select id="staminaDaysFilter" aria-label="統計対象の期間">
+              <option value="7">直近7日</option>
+              <option value="30" selected>直近30日</option>
+              <option value="90">直近90日</option>
+              <option value="365">直近365日</option>
+            </select>
+          </label>
+          <button id="staminaRefresh" type="button">↻ 統計を更新</button>
+        </div>
+      </div>
+      <p id="staminaMessage" class="stamina-notice" role="status" aria-live="polite">Oracleの使用履歴を読み込んでいます…</p>
+      <div id="staminaSummary" class="stamina-stat-summary"></div>
+      <div class="stamina-charts">
+        <div class="stamina-subpanel">
+          <h3>よく使用・減少する時間帯（0〜23時）</h3>
+          <p class="stamina-caption">縦軸は相対的な消費量。青＝手動記録、橙＝減少を観測した推定量です。</p>
+          <div id="staminaHours" class="hour-graph" aria-label="時間帯ごとのスタミナ使用統計"></div>
+          <div class="chart-legend">
+            <span><i style="background:#7087ff"></i>手動</span>
+            <span><i style="background:#f3b35b"></i>推定（観測時刻）</span>
+          </div>
+        </div>
+        <div class="stamina-subpanel">
+          <h3>最近の日別推移</h3>
+          <p class="stamina-caption">直近14日（7日表示では7日）。青と橙の割合を分けて表示。</p>
+          <div id="staminaDaily" class="usage-days" aria-label="日別のスタミナ使用統計"></div>
+        </div>
+      </div>
+      <div class="stamina-subpanel" style="margin-top:13px">
+        <h3>スタミナを使った時刻を手動で登録</h3>
+        <p class="stamina-caption">正確な使用時刻が分かる場合に入力してください。自動観測だけでは正確な使用時刻は分かりません。</p>
+        <form id="staminaUseForm" class="stamina-form">
+          <label>ゲーム
+            <select name="gameId" required>
+              <option value="1">スターレイル</option>
+              <option value="2">原神</option>
+              <option value="3">ゼンゼロ</option>
+            </select>
+          </label>
+          <label>使用日時（JST）<input id="staminaUsedAt" name="usedAt" type="datetime-local" required></label>
+          <label>消費量<input name="amount" type="number" min="1" max="999999" required placeholder="例：120"></label>
+          <label>メモ<input name="note" type="text" maxlength="200" placeholder="例：デイリー消化"></label>
+          <button class="primary" type="submit">＋ 使用を記録</button>
+        </form>
+      </div>
+      <div class="stamina-history-head">
+        <h3>使用履歴（手動・推定）</h3>
+        <span class="stamina-caption">履歴ごとに削除できます</span>
+      </div>
+      <div class="stamina-scroll">
+        <table class="stamina-history">
+          <thead><tr><th>記録日時（JST）</th><th>ゲーム</th><th>量</th><th>区分</th><th>メモ</th><th>操作</th></tr></thead>
+          <tbody id="staminaHistory"></tbody>
+        </table>
+      </div>
+      <details class="resource-history-box">
+        <summary>スタミナ残量の観測・保存履歴を見る</summary>
+        <p class="stamina-caption">HoYoLAB観測値は比較計算の基準として保存します。Oracle記録は個別削除できます。</p>
+        <div class="stamina-scroll">
+          <table class="stamina-history">
+            <thead><tr><th>記録日時（JST）</th><th>ゲーム</th><th>残量 / 最大</th><th>区分</th><th>操作</th></tr></thead>
+            <tbody id="staminaResourceHistory"></tbody>
+          </table>
+        </div>
+      </details>
+      <p class="stamina-caption" style="margin:14px 0 0">
+        ※ HoYoLABの自動推定は、直前の取得から現在までの残量減少のみ検知します。
+        実際に使った時刻ではなく「減少を検知した時刻」です。自然回復を挟むと実際の消費量とも一致しません。
+        ブラウザやアプリを閉じている間は定期取得されません。
+      </p>
     </section>
     <section class="add-panel panel" aria-labelledby="addHeading">
       <div>
