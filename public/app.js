@@ -105,6 +105,7 @@ async function operation(task) {
   try {
     const message = await task();
     await reload(message);
+    window.dispatchEvent(new Event("stamina-updated"));
   } catch (error) {
     setNotice(error.message, "error");
   } finally {
@@ -157,6 +158,17 @@ async function loadHoyo({ force = false } = {}) {
       : data.message || "HoYoLABが未設定です。";
     element("hoyoGames").innerHTML = (data.games || []).map(renderHoyoCard).join("");
     element("hoyoImport").disabled = !hoyoEnabled || pending;
+    // 日課実績は触らず、HoYoLABのリソース観測履歴だけ自動保存する。
+    if (hoyoEnabled && data.fetchedAt) {
+      try {
+        const observed = await api("/api/stamina/observe", { method: "POST", body: "{}" });
+        if (observed.snapshots > 0) window.dispatchEvent(new Event("stamina-updated"));
+      } catch (_error) {
+        element("hoyoStatus").textContent +=
+          " ※観測履歴の保存には sql/06_stamina_history.sql の適用が必要です。";
+      }
+    }
+
   } catch (error) {
     element("hoyoStatus").textContent = "HoYoLABを取得できません: " + error.message +
       "。Oracleに登録済みの手動記録はそのまま使えます。";
