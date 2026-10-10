@@ -110,6 +110,7 @@ async function operation(task) {
   } finally {
     pending = false;
     document.querySelectorAll("button").forEach((button) => button.disabled = false);
+    element("hoyoImport").disabled = !hoyoEnabled;
   }
 }
 
