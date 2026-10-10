@@ -49,3 +49,29 @@ dialog::backdrop{background:#050810b8}.dialog-form{display:grid;gap:14px}.dialog
 @media(max-width:1130px){.games{grid-template-columns:repeat(2,minmax(0,1fr))}.add-panel{grid-template-columns:1fr}.add-form{grid-template-columns:1fr 1.5fr .7fr auto}}
 @media(max-width:730px){.shell{padding-top:26px}.hero{align-items:start;flex-direction:column}.games{grid-template-columns:1fr}.add-form{grid-template-columns:1fr 1fr}.add-form button{grid-column:1/-1}.record-form{grid-template-columns:85px minmax(0,1fr) auto}}
 @media(max-width:390px){.record-form{grid-template-columns:80px minmax(0,1fr)}.record-form button{grid-column:1/-1}}
+
+
+/* HoYoLAB live snapshot */
+.hoyo-panel{padding:22px;margin-bottom:20px}
+.hoyo-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.hoyo-heading h2{margin:7px 0}
+.hoyo-heading .muted{margin:6px 0 0}
+.hoyo-controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:end}
+.hoyo-controls button{white-space:nowrap}
+.hoyo-status{font-size:12px;color:#aebee1;border-top:1px solid #26324a;margin:16px 0 12px;padding-top:13px}
+.hoyo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.hoyo-card{position:relative;min-width:0;background:#0b1424;border:1px solid #25334e;border-radius:16px;padding:17px}
+.hoyo-card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent)}
+.hoyo-card.blue{--accent:#6c7cff}.hoyo-card.gold{--accent:#e9b95f}.hoyo-card.lime{--accent:#9ae63c}
+.hoyo-card h3{font-size:15px;margin:5px 0 7px}
+.hoyo-uid{font-size:11px;color:#8d9db9;margin-bottom:12px}
+.hoyo-stat{border-top:1px solid #25334c;padding:9px 0;display:flex;justify-content:space-between;gap:12px}
+.hoyo-stat span{font-size:11px;color:#9baccd}.hoyo-stat strong{font-size:13px;text-align:right}
+.hoyo-note{color:#93a4c1;font-size:11px;margin:7px 0}
+.hoyo-badge{font-size:10px;display:inline-block;border:1px solid #425272;color:#a7bee9;border-radius:12px;padding:4px 7px}
+.hoyo-badge.done{color:#92edc5;border-color:#286c51}
+.hoyo-badge.warn{color:#ffb3b7;border-color:#824551}
+.hoyo-help{font-size:11px;color:#8e9bb7;margin:13px 0 0;line-height:1.7}
+.hoyo-help code{color:#c3d5f7}
+@media(max-width:1020px){.hoyo-heading{align-items:start;flex-direction:column}.hoyo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:690px){.hoyo-grid{grid-template-columns:1fr}.hoyo-controls{justify-content:start}.hoyo-controls button{white-space:normal}}
