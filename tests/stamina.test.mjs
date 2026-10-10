@@ -31,10 +31,14 @@ const db = {
       }] : [] };
     }
     if (sql.startsWith("INSERT INTO hoyo_resource_snapshots")) {
+      assert.match(sql, /observed_at_key/);
+      assert.match(binds.observedAtKey, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
       previous = { value: binds.currentAmount, max: binds.maxAmount, at: binds.observedAt };
       inserted++;
     }
     if (sql.startsWith("INSERT INTO stamina_use_logs")) {
+      assert.match(sql, /observed_at_key = :observedAtKey/);
+      assert.match(binds.observedAtKey, /^\d{4}-\d\d-\d\dT/);
       assert.equal(binds.amount, 50);
       uses++;
     }
