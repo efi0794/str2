@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>STR2 | Oracle Daily Command Center</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">STR2 / ORACLE DATABASE EDITION</div>
+        <h1>今日、全部やった？</h1>
+        <p class="lead">3ゲームのデイリーをOracle Databaseで管理。今日の記録を登録・編集・削除できます。</p>
+      </div>
+      <button id="reloadButton" class="refresh" type="button">↻ 最新状態に更新</button>
+    </header>
+    <div class="notice" id="notice" role="status" aria-live="polite">Oracleへの接続を確認しています…</div>
+    <section class="summary" aria-label="全体進捗">
+      <span class="pill">日付 <b id="today">--</b></span>
+      <span class="pill">タスク数 <b id="total">--</b></span>
+      <span class="pill">完了 <b id="done">--</b></span>
+      <span class="pill">未完了 <b id="left">--</b></span>
+      <span class="pill oracle-pill">● ORACLE LOCAL</span>
+    </section>
+    <section aria-label="ゲーム別の状況">
+      <div id="board" class="games"></div>
+    </section>
+    <section class="add-panel panel" aria-labelledby="addHeading">
+      <div>
+        <span class="section-label">CREATE / INSERT</span>
+        <h2 id="addHeading">新しいデイリーを追加</h2>
+        <p class="muted">ゲーム・タスク名・目標値を登録します。データはOracleの実表に保存されます。</p>
+      </div>
+      <form id="addTaskForm" class="add-form">
+        <label>ゲーム<select name="gameId" id="addGame" required></select></label>
+        <label>タスク名<input name="title" maxlength="80" required placeholder="例：探索派遣を確認"></label>
+        <label>目標値<input name="targetCount" type="number" min="1" max="9999" value="1" required></label>
+        <button class="primary" type="submit">＋ タスクを登録</button>
+      </form>
+    </section>
+    <footer>
+      <span>STR2 — strを基にした、Oracle学習用の独立Webアプリ</span>
+      <span>※ 日課・リソースは手動記録。HoYoLABから自動取得する版ではありません。</span>
+    </footer>
+  </main>
+  <dialog id="editDialog" aria-labelledby="editHeading">
+    <form id="editTaskForm" class="dialog-form">
+      <div class="section-label">UPDATE / SQL</div>
+      <h2 id="editHeading">タスクを編集</h2>
+      <input type="hidden" name="taskId" id="editTaskId">
+      <label>ゲーム<select name="gameId" id="editGame" required></select></label>
+      <label>タスク名<input name="title" id="editTitle" maxlength="80" required></label>
+      <label>目標値<input name="targetCount" id="editTarget" type="number" min="1" max="9999" required></label>
+      <p class="muted">※ 目標値を変更すると達成判定も再計算されます。</p>
+      <div class="dialog-actions">
+        <button type="button" id="closeEdit">キャンセル</button>
+        <button class="primary" type="submit">変更を保存</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
