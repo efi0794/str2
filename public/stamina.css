@@ -1,0 +1,51 @@
+
+.stamina-panel{padding:23px;margin-top:19px}
+.stamina-head{display:flex;justify-content:space-between;align-items:start;gap:15px}
+.stamina-head h2{font-size:24px;margin:7px 0 5px}
+.stamina-filters{display:flex;align-items:end;gap:8px;flex-wrap:wrap}
+.stamina-filters label{min-width:120px}
+.stamina-filters button{height:40px}
+.stamina-notice{color:#b2c5e3;font-size:12px;margin:12px 0 17px;line-height:1.7}
+.stamina-notice.error{color:#ffabb7}
+.stamina-stat-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:17px}
+.stat-tile{background:#0c1527;border:1px solid #28364f;border-radius:15px;padding:14px}
+.stat-tile small{display:block;color:#95a7c7;font-size:11px;margin-bottom:5px}
+.stat-tile strong{font-size:25px}
+.stamina-charts{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:12px}
+.stamina-subpanel{padding:17px;background:#0a1120;border:1px solid #28354d;border-radius:16px;min-width:0}
+.stamina-subpanel h3{font-size:15px;margin:0 0 7px}
+.stamina-caption{color:#95a4c0;font-size:11px;line-height:1.6}
+.hour-graph{display:flex;align-items:end;gap:5px;height:190px;overflow-x:auto;margin-top:12px;padding-bottom:2px}
+.hour-col{min-width:23px;flex:1;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:4px;height:100%}
+.hour-height{height:135px;width:100%;display:flex;flex-direction:column;justify-content:end}
+.hour-bar{width:100%;display:flex;flex-direction:column;justify-content:end;min-height:0;border-radius:4px 4px 0 0;overflow:hidden}
+.segment-manual{background:#7087ff}.segment-estimated{background:#f3b35b}
+.hour-label{color:#9aa9c2;font-size:9px}
+.chart-legend{display:flex;gap:15px;font-size:11px;color:#9aabc4;margin-top:7px}
+.chart-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.usage-days{display:grid;gap:7px;margin-top:16px}
+.usage-day{display:grid;grid-template-columns:38px 1fr 46px;gap:8px;align-items:center;color:#a2b1cd;font-size:10px}
+.day-track{display:flex;align-items:stretch;height:10px;background:#202c44;border-radius:50px;overflow:hidden}
+.day-track i{display:block;height:100%}
+.day-track i.manual{background:#7087ff}.day-track i.estimated{background:#f3b35b}
+.day-amount{text-align:right;color:#d5dffa;font-size:11px}
+.stamina-form{display:grid;grid-template-columns:1fr 1fr 1fr 1.6fr auto;gap:9px;align-items:end;margin-top:15px}
+.stamina-form button{white-space:nowrap}
+.stamina-history-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:20px}
+.stamina-history-head h3{margin:0;font-size:16px}
+.stamina-scroll{overflow-x:auto;margin-top:10px}
+.stamina-history{border-collapse:collapse;width:100%;min-width:625px;font-size:12px}
+.stamina-history th,.stamina-history td{border-bottom:1px solid #29364c;padding:11px 9px;text-align:left;vertical-align:middle}
+.stamina-history th{font-size:11px;color:#97aacc;font-weight:700}
+.stamina-history td{color:#d6dff3}
+.stamina-history td:nth-last-child(1){text-align:right}
+.stamina-history tbody tr:hover{background:#142037}
+.stamina-kind{padding:4px 8px;border-radius:8px;background:#182b48;color:#b7c8ff;white-space:nowrap;font-size:10px}
+.stamina-kind.estimate{background:#473319;color:#ffd3a0}
+.stamina-kind.hoyo{background:#184032;color:#a4efd0}
+.stamina-empty{text-align:center;padding:25px 10px;color:#8498b9;font-size:12px}
+.resource-history-box{margin-top:18px;border:1px solid #28354d;border-radius:14px;padding:13px 16px}
+.resource-history-box summary{cursor:pointer;font-weight:750;color:#d8e4fa}
+.resource-history-box .stamina-scroll{margin-top:12px}
+@media(max-width:980px){.stamina-head{flex-direction:column}.stamina-charts{grid-template-columns:1fr}.stamina-form{grid-template-columns:1fr 1fr}.stamina-form button{grid-column:1/-1}}
+@media(max-width:530px){.stamina-stat-summary{grid-template-columns:1fr}.stamina-form{grid-template-columns:1fr}.stamina-filters label{min-width:110px}}
