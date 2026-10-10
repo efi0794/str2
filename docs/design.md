@@ -4,6 +4,7 @@
 既存strの「3ゲームの日課を1画面で見る」体験を残し、SQL学習課題のOracle Database連携・CRUD・VIEWを実装する。
 - 画面: HTML / CSS / JavaScript (既存strに近いダークUI)
 - Webサーバー: Node.js 20+ / Express
+- HoYoLAB取得: node-hoyolab (非公式ライブラリ、認証情報はローカル環境変数からのみ読み込み)
 - DBドライバー: node-oracledb Thin mode
 - DB: Oracle Database 12c以上 (学校の環境)
 - 配置: 学校PCのlocalhost (1人用デモ)
@@ -20,9 +21,11 @@ flowchart TD
     E --> D
     D -->|SQL SELECT / INSERT / UPDATE / DELETE| O
     O -->|結果行| D
+    H[HoYoLAB / 外部API] -->|最新ステータス| E
 ~~~~
 
-- 外部のHoYoLABサーバーやCloudflareを使わない。
+- Oracleとは別にHoYoLABから取得した最新情報を画面に表示する。Cloudflareは使用しない。
+- HoYoLABは表示時・約10分おきに再取得し、サーバーで短時間キャッシュする。
 - SQLのJOIN、集計、CASE、NVL、ROW_NUMBERなどのロジックはVIEW側へ集約する。
 - ExpressはVIEWからSELECTし、登録・更新・削除だけ実表へSQLを発行する。
 
@@ -112,12 +115,21 @@ Web画面では V_GAME_PROGRESS・V_DAILY_TASK_STATUS・V_LATEST_RESOURCES を�
 | PUT | /api/records/:taskId | UPDATE | TASK_RECORDS |
 | DELETE | /api/records/:taskId | DELETE | TASK_RECORDS |
 | POST | /api/resources | INSERT | RESOURCE_LOGS |
+| GET | /api/hoyo/status | 外部API取得 | Oracleを書き換えずに最新ステータスを返す |
+| POST | /api/hoyo/sync | MERGE / INSERT / UPDATE | 取得に成功した数値を実表へ取り込む |
 
 SQL値はバインド変数で渡し、文字列連結SQLを避ける。更新系はデータベースCOMMIT後に結果を返す。
 
 ## 今回の制約
 - 発表用のため、ログインはなくユーザーID=1に固定。
 - Oracleが起動していないPCではバックエンドのAPIが動作しない。
-- HoYoLABからの自動取得、Discord通知はなし（独立したローカル用アプリ）。
+- HoYoLABの自動取得・取得データのOracle取り込みは実装。Discord通知はなし。
 - 最新ステータスはデータベースの SYSDATE を基準に当日表示する。
 - 一般公開や他人への利用提供には別途認証・アクセス権限の実装が必要。
+
+## HoYoLAB自動取得の方針
+- CookieとUIDはローカルの.envにのみ設定し、OracleやブラウザへCookieそのものは渡さない。
+- Oracleへの転記は明示的な操作時のみ。手動実績を上書きする場合があることを確認ダイアログで通知する。
+- 不明なAPI値を0として記録しない。ゲーム名・タスク名・目標値が一致しないデータは取り込まない。
+- サーバーの5分キャッシュ、強制再取得の最低1分間隔でリクエストを減らす。
+- HoYoLABが使えない場合もOracleのCRUDデモは利用できる。
