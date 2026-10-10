@@ -20,6 +20,7 @@ oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "16kb" }));
+app.use((req, _res, next) => { req.body ??= {}; next(); });
 app.use(express.static(fileURLToPath(new URL("./public/", import.meta.url))));
 
 // ローカルデモ用途。外部公開・複数人利用には認証とCSRF対策が別途必要です。
@@ -93,12 +94,11 @@ app.get("/api/health", dbRoute(async (_req, res, db) => {
 }));
 
 app.get("/api/dashboard", dbRoute(async (_req, res, db) => {
-  const [date, games, tasks, resources] = await Promise.all([
-    db.execute("SELECT TO_CHAR(TRUNC(SYSDATE), 'YYYY-MM-DD') AS TODAY FROM dual"),
-    db.execute("SELECT * FROM v_game_progress WHERE user_id = :userId ORDER BY game_id", { userId: USER_ID }),
-    db.execute("SELECT * FROM v_daily_task_status WHERE user_id = :userId ORDER BY game_id, sort_order, task_id", { userId: USER_ID }),
-    db.execute("SELECT * FROM v_latest_resources WHERE user_id = :userId ORDER BY game_id", { userId: USER_ID })
-  ]);
+  // 1つのOracle接続ではDB操作を順番に実行し、並列利用を避ける。
+  const date = await db.execute("SELECT TO_CHAR(TRUNC(SYSDATE), 'YYYY-MM-DD') AS TODAY FROM dual");
+  const games = await db.execute("SELECT * FROM v_game_progress WHERE user_id = :userId ORDER BY game_id", { userId: USER_ID });
+  const tasks = await db.execute("SELECT * FROM v_daily_task_status WHERE user_id = :userId ORDER BY game_id, sort_order, task_id", { userId: USER_ID });
+  const resources = await db.execute("SELECT * FROM v_latest_resources WHERE user_id = :userId ORDER BY game_id", { userId: USER_ID });
   res.json({
     ok: true,
     today: date.rows[0].TODAY,
