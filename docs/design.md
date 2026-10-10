@@ -16,7 +16,7 @@ flowchart TD
     B[ブラウザ<br/>HTML/CSS/JavaScript]
     E[Express Webサーバー<br/>127.0.0.1:3000]
     D[node-oracledb<br/>SQLバインド変数]
-    O[(Oracle Database<br/>5実表 / 6 VIEW)]
+    O[(Oracle Database<br/>7実表 / 9 VIEW)]
     B -->|HTTP / JSON| E
     E --> D
     D -->|SQL SELECT / INSERT / UPDATE / DELETE| O
@@ -35,8 +35,13 @@ flowchart TD
 erDiagram
     USERS ||--o{ TASK_RECORDS : records
     USERS ||--o{ RESOURCE_LOGS : saves
+    USERS ||--o{ STAMINA_USE_LOGS : records
+    USERS ||--o{ HOYO_RESOURCE_SNAPSHOTS : observes
     GAMES ||--o{ DAILY_TASKS : contains
     GAMES ||--o{ RESOURCE_LOGS : measures
+    GAMES ||--o{ STAMINA_USE_LOGS : spends
+    GAMES ||--o{ HOYO_RESOURCE_SNAPSHOTS : observes
+    HOYO_RESOURCE_SNAPSHOTS |o--o| STAMINA_USE_LOGS : estimates
     DAILY_TASKS ||--o{ TASK_RECORDS : tracks
     USERS {
       NUMBER user_id PK
@@ -75,6 +80,24 @@ erDiagram
       NUMBER max_amount
       TIMESTAMP measured_at
     }
+    HOYO_RESOURCE_SNAPSHOTS {
+      NUMBER snapshot_id PK
+      NUMBER user_id FK
+      NUMBER game_id FK
+      NUMBER current_amount
+      NUMBER max_amount
+      TIMESTAMP_TZ observed_at
+    }
+    STAMINA_USE_LOGS {
+      NUMBER use_id PK
+      NUMBER user_id FK
+      NUMBER game_id FK
+      NUMBER amount
+      TIMESTAMP_TZ used_at
+      VARCHAR2 source
+      VARCHAR2 note
+      NUMBER snapshot_id FK
+    }
 ~~~~
 
 ## テーブル定義書（抜粋）
@@ -86,6 +109,8 @@ erDiagram
 | DAILY_TASKS | TASK_ID NUMBER IDENTITY | GAME_ID NUMBER FK, TITLE VARCHAR2(80 CHAR), TARGET_COUNT NUMBER(8), SORT_ORDER NUMBER(5), IS_ACTIVE NUMBER(1) | タスクマスタ |
 | TASK_RECORDS | RECORD_ID NUMBER IDENTITY | USER_ID NUMBER FK, TASK_ID NUMBER FK, RECORD_DATE DATE, PROGRESS NUMBER(8), NOTE VARCHAR2(200 CHAR), UPDATED_AT TIMESTAMP | 今日のタスク実績 |
 | RESOURCE_LOGS | RESOURCE_ID NUMBER IDENTITY | USER_ID NUMBER FK, GAME_ID NUMBER FK, CURRENT_AMOUNT NUMBER(8), MAX_AMOUNT NUMBER(8), MEASURED_AT TIMESTAMP | スタミナ等の推移 |
+| HOYO_RESOURCE_SNAPSHOTS | SNAPSHOT_ID NUMBER IDENTITY | USER_ID NUMBER FK, GAME_ID NUMBER FK, CURRENT_AMOUNT NUMBER(8), MAX_AMOUNT NUMBER(8), OBSERVED_AT TIMESTAMP WITH TIME ZONE | HoYoLABの自動取得時点の残量（重複防止） |
+| STAMINA_USE_LOGS | USE_ID NUMBER IDENTITY | USER_ID NUMBER FK, GAME_ID NUMBER FK, AMOUNT NUMBER(8), USED_AT TIMESTAMP WITH TIME ZONE, SOURCE VARCHAR2(12), NOTE VARCHAR2(200), SNAPSHOT_ID FK | 手動の正確な時刻／観測差分の推定履歴 |
 
 追加制約: TASK_RECORDS は (USER_ID, TASK_ID, RECORD_DATE) の組合せをUNIQUEにし、同じ日の二重登録を防止。RECORD_DATEは日付の0時を保存。TASK_RECORDS→DAILY_TASKSには ON DELETE CASCADE。RESOURCE_LOGSは現在値が最大値以下となるCHECK制約付き。詳細なDEFAULT・制約・索引は sql/01_schema.sql が正式定義。
 
@@ -99,6 +124,9 @@ erDiagram
 | V_UNFINISHED_TASKS | WHERE 条件付きVIEW | 未達成の抽出 |
 | V_COMPLETED_TASKS | WHERE 条件付きVIEW | 完了したものの抽出 |
 | V_LATEST_RESOURCES | ROW_NUMBER分析関数 | ゲーム別最新のリソース値 |
+| V_STAMINA_USE_HISTORY | JOIN / TO_CHAR / AT TIME ZONE | 使用履歴と日本時間帯 |
+| V_STAMINA_HOURLY_STATS | GROUP BY / SUM / COUNT | 24時間の使用時間帯別統計 |
+| V_STAMINA_DAILY_STATS | GROUP BY / TRUNC | 日付別の統計 |
 
 Web画面では V_GAME_PROGRESS・V_DAILY_TASK_STATUS・V_LATEST_RESOURCES を参照する。
 その他の3 VIEWは sql/04_verify.sql で確認できる。
@@ -117,6 +145,11 @@ Web画面では V_GAME_PROGRESS・V_DAILY_TASK_STATUS・V_LATEST_RESOURCES を�
 | POST | /api/resources | INSERT | RESOURCE_LOGS |
 | GET | /api/hoyo/status | 外部API取得 | Oracleを書き換えずに最新ステータスを返す |
 | POST | /api/hoyo/sync | MERGE / INSERT / UPDATE | 取得に成功した数値を実表へ取り込む |
+| POST | /api/stamina/observe | SELECT / INSERT | HoYoLAB最新観測値の履歴保存・減少時の推定記録 |
+| GET | /api/stamina/analytics | SELECT / GROUP BY | 期間別・ゲーム別の統計と履歴 |
+| POST | /api/stamina/use | INSERT | 使用時刻・量の手動記録 |
+| DELETE | /api/stamina/use/:id | DELETE | 使用履歴を個別削除 |
+| DELETE | /api/resources/:id | DELETE | Oracle側の残量履歴を個別削除 |
 
 SQL値はバインド変数で渡し、文字列連結SQLを避ける。更新系はデータベースCOMMIT後に結果を返す。
 
@@ -133,3 +166,12 @@ SQL値はバインド変数で渡し、文字列連結SQLを避ける。更新�
 - 不明なAPI値を0として記録しない。ゲーム名・タスク名・目標値が一致しないデータは取り込まない。
 - サーバーの5分キャッシュ、強制再取得の最低1分間隔でリクエストを減らす。
 - HoYoLABが使えない場合もOracleのCRUDデモは利用できる。
+
+## スタミナ観測・統計の仕様
+- 追加SQLは `sql/06_stamina_history.sql`。**既存のテーブルやVIEWは破棄しない**。
+- HoYoLABの取得の後、ブラウザが `/api/stamina/observe` を呼び、最後に取得した有効な残量と日時をスナップショット表へ保存する。キャッシュとUNIQUE制約により同一取得時刻の重複を回避。
+- 前回と最新の最大値が同じで、最新の残量が下がったときだけその差分を推定使用記録として保存する。消費日時は分からないため使用時刻ではなく**検知時刻**として記録する。
+- 消費統計は手動と推定を区分し、JSTの時刻で時間帯別・日別に計算する。
+- 使用履歴を削除しても観測スナップショットは残す。これにより元の取得情報による同一推定履歴の復活を防ぐ。
+- 推定ログと手動ログの合計量は厳密なゲーム内消費量ではない（自然回復・両方の記録の重複のため）。比較指標として表示する。
+- 自動観測はNode.jsサーバーが起動し、ブラウザが取得を行う間だけ有効。常時バックグラウンド追跡ではない。
