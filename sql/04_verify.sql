@@ -15,3 +15,9 @@ SELECT * FROM v_latest_resources WHERE user_id = 1 ORDER BY game_id;
 SELECT * FROM daily_tasks ORDER BY game_id, task_id;
 SELECT * FROM task_records ORDER BY record_id;
 SELECT * FROM resource_logs ORDER BY resource_id;
+
+-- sql/06_stamina_history.sql 適用後の統計・履歴
+SELECT * FROM v_stamina_use_history ORDER BY used_at DESC FETCH FIRST 30 ROWS ONLY;
+SELECT * FROM v_stamina_hourly_stats ORDER BY game_id, hour_jst;
+SELECT * FROM v_stamina_daily_stats ORDER BY day_jst DESC, game_id;
+SELECT * FROM hoyo_resource_snapshots ORDER BY observed_at DESC FETCH FIRST 30 ROWS ONLY;
