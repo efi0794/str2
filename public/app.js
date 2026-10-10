@@ -113,7 +113,79 @@ async function operation(task) {
   }
 }
 
-element("reloadButton").addEventListener("click", () => operation(async () => "最新状態に更新しました。"));
+
+let hoyoEnabled = false;
+function formatHoyoValue(value) {
+  return value === null || value === undefined ? "--" : escapeHtml(value);
+}
+function renderHoyoCard(game) {
+  const error = game.error?.message;
+  const daily = game.daily || {};
+  const resource = game.resource || {};
+  const title = error ? "取得失敗" : !game.configured ? "UID未設定" :
+    daily.completed === true ? "完了" : daily.completed === false ? "未完了" : "判定不能";
+  const badgeClass = error ? "warn" : daily.completed === true ? "done" : "";
+  const checkIn = game.checkIn?.signedToday === true ? "受取済み" :
+    game.checkIn?.signedToday === false ? "未受取" : "--";
+  const extras = Array.isArray(game.extras) ? game.extras.slice(0, 3) : [];
+  return '<article class="hoyo-card ' + gameClass(game.accent) + '">' +
+    '<span class="hoyo-badge ' + badgeClass + '">' + escapeHtml(title) + '</span>' +
+    '<h3>' + escapeHtml(game.name) + '</h3><div class="hoyo-uid">UID: ' + escapeHtml(game.uid || "未設定") + '</div>' +
+    '<div class="hoyo-stat"><span>' + escapeHtml(daily.label || "デイリー") + '</span>' +
+    '<strong>' + formatHoyoValue(daily.current) + ' / ' + formatHoyoValue(daily.max) + '</strong></div>' +
+    '<div class="hoyo-stat"><span>' + escapeHtml(resource.label || "スタミナ") + '</span>' +
+    '<strong>' + formatHoyoValue(resource.current) + ' / ' + formatHoyoValue(resource.max) + '</strong></div>' +
+    '<div class="hoyo-stat"><span>ログインボーナス</span><strong>' + escapeHtml(checkIn) + '</strong></div>' +
+    extras.map(x => '<div class="hoyo-stat"><span>' + escapeHtml(x.label) + '</span><strong>' +
+      escapeHtml(x.value) + '</strong></div>').join("") +
+    (error ? '<p class="hoyo-note">' + escapeHtml(error) + '</p>' :
+      '<p class="hoyo-note">' + escapeHtml(daily.detail || "") + '</p>') +
+    '</article>';
+}
+async function loadHoyo({ force = false } = {}) {
+  const refresh = element("hoyoRefresh");
+  refresh.disabled = true;
+  element("hoyoStatus").textContent = "HoYoLABから情報を取得しています…";
+  try {
+    const data = await api("/api/hoyo/status" + (force ? "?refresh=1" : ""));
+    hoyoEnabled = data.enabled === true;
+    const time = data.fetchedAt ? new Date(data.fetchedAt).toLocaleString("ja-JP") : "未取得";
+    element("hoyoStatus").textContent = data.enabled
+      ? "HoYoLAB最終取得: " + time + (data.cached ? "（キャッシュ表示）" : "（取得更新）") +
+        "。判定不能の数値は推測しません。"
+      : data.message || "HoYoLABが未設定です。";
+    element("hoyoGames").innerHTML = (data.games || []).map(renderHoyoCard).join("");
+    element("hoyoImport").disabled = !hoyoEnabled || pending;
+  } catch (error) {
+    element("hoyoStatus").textContent = "HoYoLABを取得できません: " + error.message +
+      "。Oracleに登録済みの手動記録はそのまま使えます。";
+    element("hoyoGames").innerHTML = "";
+    hoyoEnabled = false;
+    element("hoyoImport").disabled = true;
+  } finally {
+    refresh.disabled = false;
+  }
+}
+element("hoyoRefresh").addEventListener("click", () => loadHoyo({ force: true }));
+element("hoyoImport").addEventListener("click", () => {
+  if (pending || !hoyoEnabled) return;
+  if (!window.confirm("取得できた値をOracleに保存します。対応する今日の手動実績があれば上書きします。続けますか？")) return;
+  operation(async () => {
+    const data = await api("/api/hoyo/sync", { method: "POST", body: "{}" });
+    await loadHoyo();
+    return data.message;
+  });
+});
+setInterval(() => {
+  if (!document.hidden && !pending) loadHoyo().catch(() => {});
+}, 10 * 60_000);
+
+element("reloadButton").addEventListener("click", () =>
+  operation(async () => {
+    await loadHoyo({ force: true });
+    return "OracleとHoYoLABを更新しました。";
+  })
+);
 element("addTaskForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const form = event.currentTarget;
@@ -191,6 +263,7 @@ element("editTaskForm").addEventListener("submit", (event) => {
   });
 });
 
+loadHoyo().catch(() => {});
 reload().catch((error) => {
   setNotice("起動に失敗しました：" + error.message + "　SQL(01→02→03)と.envを確認してください。", "error");
 });
