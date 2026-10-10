@@ -3,6 +3,7 @@ import { createHoYoBridge, collectImportCandidates, importCandidatesIntoOracle }
 import express from "express";
 import oracledb from "oracledb";
 import { fileURLToPath } from "node:url";
+import { resourceObservations, saveResourceObservations, checkManualTime } from "./stamina.js";
 
 const { ORACLE_USER, ORACLE_PASSWORD, ORACLE_CONNECT_STRING } = process.env;
 const PORT = Number(process.env.PORT || 3000);
@@ -234,6 +235,133 @@ app.post("/api/resources", dbRoute(async (req, res, db) => {
   );
   await db.commit();
   res.status(201).json({ ok: true, message: "リソースを記録しました。" });
+}));
+
+
+// --- スタミナ履歴・消費時間統計 ---
+// HoYoLABの新鮮な観測値を自動保存する。タスク・手動記録を上書きしない。
+// GETで副作用を起こさないよう、フロントエンドから明示的なPOSTを発行する。
+let observationQueue = Promise.resolve();
+app.post("/api/stamina/observe", dbRoute(async (_req, res, db) => {
+  const before = observationQueue;
+  let unlock;
+  observationQueue = new Promise(resolve => { unlock = resolve; });
+  await before;
+  try {
+    const status = await hoyoBridge.getStatus();
+    if (!status.enabled || !status.fetchedAt) {
+      return res.json({ ok: true, snapshots: 0, estimated: 0, skipped: 0 });
+    }
+    const candidates = resourceObservations(status.games, status.fetchedAt);
+    const result = await saveResourceObservations(db, candidates, USER_ID);
+    res.json({ ok: true, ...result });
+  } finally {
+    unlock();
+  }
+}));
+
+function staminaFilters(req) {
+  const days = integer(req.query.days ?? 30, "集計期間", 7, 365);
+  if (![7, 30, 90, 365].includes(days)) throw new InputError("集計期間は7・30・90・365日から選んでください。");
+  const gameId = integer(req.query.gameId ?? 0, "ゲームID", 0, 3);
+  return { days, gameId, userId: USER_ID };
+}
+
+// Oracle VIEWを使い、直近N日間の使用時間帯/日別統計・履歴を返す
+app.get("/api/stamina/analytics", dbRoute(async (req, res, db) => {
+  const binds = staminaFilters(req);
+  const where =
+    "WHERE user_id = :userId AND (:gameId = 0 OR game_id = :gameId) " +
+    "AND used_at >= SYSTIMESTAMP - NUMTODSINTERVAL(:days, 'DAY')";
+  const summary = await db.execute(
+    "SELECT source, COUNT(*) AS event_count, NVL(SUM(amount), 0) AS total_amount " +
+    "FROM v_stamina_use_history " + where + " GROUP BY source", binds
+  );
+  const hours = await db.execute(
+    "SELECT hour_jst, source, COUNT(*) AS event_count, SUM(amount) AS total_amount " +
+    "FROM v_stamina_use_history " + where + " GROUP BY hour_jst, source ORDER BY hour_jst, source", binds
+  );
+  const days = await db.execute(
+    "SELECT TO_CHAR(used_at AT TIME ZONE '+09:00', 'YYYY-MM-DD') AS day_jst, source, " +
+    "COUNT(*) AS event_count, SUM(amount) AS total_amount " +
+    "FROM v_stamina_use_history " + where +
+    " GROUP BY TO_CHAR(used_at AT TIME ZONE '+09:00', 'YYYY-MM-DD'), source " +
+    "ORDER BY day_jst DESC, source", binds
+  );
+  const history = await db.execute(
+    "SELECT use_id, game_id, game_name, amount, source, note, used_at_jst " +
+    "FROM v_stamina_use_history " + where +
+    " ORDER BY used_at DESC, use_id DESC FETCH FIRST 100 ROWS ONLY", binds
+  );
+
+  // HoYoLAB自動観測値と、既存のOracle記録履歴を同じ画面で閲覧できる
+  const resources = await db.execute(
+    "SELECT entry_id, game_id, game_name, current_amount, max_amount, source, observed_at_jst " +
+    "FROM (" +
+    " SELECT s.snapshot_id AS entry_id, s.game_id, g.game_name, " +
+    "s.current_amount, s.max_amount, 'HOYOLAB' AS source, s.observed_at AS observed_at, " +
+    "TO_CHAR(s.observed_at AT TIME ZONE '+09:00', 'YYYY-MM-DD HH24:MI') AS observed_at_jst " +
+    "FROM hoyo_resource_snapshots s JOIN games g ON g.game_id = s.game_id " +
+    "WHERE s.user_id = :userId " +
+    "UNION ALL " +
+    "SELECT r.resource_id AS entry_id, r.game_id, g.game_name, " +
+    "r.current_amount, r.max_amount, 'ORACLE' AS source, " +
+    "FROM_TZ(r.measured_at, SESSIONTIMEZONE) AS observed_at, " +
+    "TO_CHAR(FROM_TZ(r.measured_at, SESSIONTIMEZONE) AT TIME ZONE '+09:00', 'YYYY-MM-DD HH24:MI') AS observed_at_jst " +
+    "FROM resource_logs r JOIN games g ON g.game_id = r.game_id " +
+    "WHERE r.user_id = :userId" +
+    ") WHERE (:gameId = 0 OR game_id = :gameId) " +
+    "AND observed_at >= SYSTIMESTAMP - NUMTODSINTERVAL(:days, 'DAY') " +
+    "ORDER BY observed_at DESC, entry_id DESC FETCH FIRST 100 ROWS ONLY", binds
+  );
+  res.json({
+    ok: true, filters: { gameId: binds.gameId, days: binds.days },
+    summary: summary.rows.map(toCamel), hours: hours.rows.map(toCamel),
+    daily: days.rows.map(toCamel), history: history.rows.map(toCamel),
+    resourceHistory: resources.rows.map(toCamel)
+  });
+}));
+
+// 正確に分かる場合は手動の時刻・消費量を記録
+app.post("/api/stamina/use", dbRoute(async (req, res, db) => {
+  const gameId = integer(req.body.gameId, "ゲームID", 1, 3);
+  const amount = integer(req.body.amount, "消費量", 1, 999999);
+  const note = textValue(req.body.note, "メモ", 200);
+  let usedAt;
+  try { usedAt = checkManualTime(req.body.usedAt); }
+  catch (error) { throw new InputError(error.message); }
+  await db.execute(
+    "INSERT INTO stamina_use_logs (user_id, game_id, amount, used_at, source, note) " +
+    "VALUES (:userId, :gameId, :amount, " +
+    "FROM_TZ(TO_TIMESTAMP(:usedAt, 'YYYY-MM-DD\"T\"HH24:MI'), '+09:00'), 'MANUAL', :note)",
+    { userId: USER_ID, gameId, amount, usedAt, note }
+  );
+  await db.commit();
+  res.status(201).json({ ok: true, message: "使用履歴を登録しました。" });
+}));
+
+// 手動・推定どちらも1件ずつ削除できる。観測スナップショットは残すため同一取得から復活しない。
+app.delete("/api/stamina/use/:id", dbRoute(async (req, res, db) => {
+  const id = integer(req.params.id, "履歴ID", 1);
+  const result = await db.execute(
+    "DELETE FROM stamina_use_logs WHERE use_id = :id AND user_id = :userId",
+    { id, userId: USER_ID }
+  );
+  if (!result.rowsAffected) throw new InputError("履歴が見つかりません。", 404);
+  await db.commit();
+  res.json({ ok: true, message: "消費履歴を削除しました。" });
+}));
+
+// 元からあるresource_logs側の個別履歴も削除可能にする
+app.delete("/api/resources/:id", dbRoute(async (req, res, db) => {
+  const id = integer(req.params.id, "リソース履歴ID", 1);
+  const result = await db.execute(
+    "DELETE FROM resource_logs WHERE resource_id = :id AND user_id = :userId",
+    { id, userId: USER_ID }
+  );
+  if (!result.rowsAffected) throw new InputError("リソース履歴が見つかりません。", 404);
+  await db.commit();
+  res.json({ ok: true, message: "リソース履歴を削除しました。" });
 }));
 
 app.use("/api", (_req, res) => res.status(404).json({ ok: false, error: "APIが見つかりません。" }));
